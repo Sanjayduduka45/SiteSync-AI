@@ -15,6 +15,7 @@ frontend/dist/
 frontend/node_modules/
 frontend/.npm
 frontend/.pnpm-store/
+frontend/.env.local
 
 # ============================================================
 # BACKEND (Python / FastAPI)

@@ -97,10 +97,10 @@ Field Input (text / voice / photo)
 
 ## Current Phase
 
-**Phase 0 — Foundation**
+**Phase 1 — Scaffold**
 Status: Complete
 
-No application features are implemented. The next phase is Phase 1 — Scaffold.
+Frontend and backend scaffolds are operational. The next phase is Phase 2 — Authentication.
 
 ---
 
