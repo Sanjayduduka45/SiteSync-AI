@@ -52,7 +52,7 @@
 **Objective**: Establish working project skeleton with no application features.
 
 **Planned Scope**:
-- Frontend: Next.js + TypeScript + Tailwind + shadcn/ui initialized
+- Frontend: React + Vite + TypeScript + Tailwind + shadcn/ui initialized
 - Backend: FastAPI + Pydantic v2 project initialized
 - Supabase project connection configured (env-based)
 - Basic health-check API endpoint

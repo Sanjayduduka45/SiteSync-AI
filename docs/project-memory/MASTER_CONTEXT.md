@@ -48,10 +48,13 @@ Field Input (text / voice / photo)
 ## Locked Technology Stack
 
 ### Frontend
-- **Next.js** — React framework, App Router
+- **React** — UI library
 - **TypeScript** — strict mode
+- **Vite** — build tool and dev server
 - **Tailwind CSS** — utility-first styling
 - **shadcn/ui** — component library
+- **React Router** — client-side routing
+- **TanStack Query** — server state management
 
 ### Backend
 - **FastAPI** — Python async REST API

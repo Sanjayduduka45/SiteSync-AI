@@ -31,7 +31,7 @@
 
 | Item | Phase |
 |---|---|
-| Frontend application (Next.js) | Phase 1 |
+| Frontend application (React + Vite) | Phase 1 |
 | Backend application (FastAPI) | Phase 1 |
 | Database schema | Phase 1+ |
 | Supabase project configuration | Phase 1 |
@@ -52,7 +52,7 @@
 See `DECISIONS.md` for all architectural decision records.
 
 Key decisions in effect:
-- Next.js + TypeScript + Tailwind + shadcn/ui (frontend)
+- React + Vite + TypeScript + Tailwind + shadcn/ui + React Router + TanStack Query (frontend)
 - FastAPI + Python + Pydantic v2 (backend)
 - Supabase (PostgreSQL + Auth + Storage) (platform)
 - pgvector for embeddings

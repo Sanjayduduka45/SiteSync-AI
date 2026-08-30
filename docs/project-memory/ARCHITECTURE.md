@@ -2,12 +2,12 @@
 
 ## System Overview
 
-SiteSync AI is a client-server application. The frontend is a Next.js web app. The backend is a FastAPI REST API. Data is stored in Supabase PostgreSQL with pgvector. Files are stored in Supabase Storage. Auth is managed by Supabase Auth.
+SiteSync AI is a client-server application. The frontend is a React (Vite) single-page application. The backend is a FastAPI REST API. Data is stored in Supabase PostgreSQL with pgvector. Files are stored in Supabase Storage. Auth is managed by Supabase Auth.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLIENT BROWSER                       │
-│                  Next.js + TypeScript + Tailwind            │
+│           React + Vite + TypeScript + Tailwind              │
 │                         shadcn/ui                           │
 └──────────────────────────┬──────────────────────────────────┘
                            │ REST (HTTPS)
@@ -37,24 +37,28 @@ SiteSync AI is a client-server application. The frontend is a Next.js web app. T
 ## Frontend Architecture
 
 ### Framework
-- **Next.js** — App Router (not Pages Router)
+- **React** — UI library
 - **TypeScript** — strict mode enabled
+- **Vite** — build tool and dev server
 - **Tailwind CSS** — utility-first, configuration-based design tokens
 - **shadcn/ui** — component library (do not replace or override with another)
+- **React Router** — client-side routing
+- **TanStack Query** — server state and data fetching
 
 ### Directory Structure (planned)
 
 ```
 frontend/
-  app/                   # Next.js App Router pages
-  components/            # Shared UI components
-    ui/                  # shadcn/ui components (auto-generated)
-    domain/              # Domain-specific components
-  lib/                   # Utilities, API clients, helpers
-  types/                 # TypeScript type definitions
-  hooks/                 # Custom React hooks
+  src/
+    pages/               # Route-level page components (React Router)
+    components/          # Shared UI components
+      ui/                # shadcn/ui components (auto-generated)
+      domain/            # Domain-specific components
+    lib/                 # Utilities, API clients, helpers
+    types/               # TypeScript type definitions
+    hooks/               # Custom React hooks
   public/                # Static assets
-  next.config.ts
+  vite.config.ts
   tailwind.config.ts
   tsconfig.json
 ```

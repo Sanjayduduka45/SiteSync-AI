@@ -14,10 +14,12 @@
 
 | Item | Locked Value | Reference |
 |---|---|---|
-| Frontend framework | Next.js (App Router) | ADR-001 |
-| Frontend language | TypeScript (strict mode) | ADR-001 |
-| Frontend styling | Tailwind CSS | ADR-001 |
-| Frontend components | shadcn/ui | ADR-001 |
+| Frontend framework | React + Vite | ADR-008 |
+| Frontend language | TypeScript (strict mode) | ADR-008 |
+| Frontend styling | Tailwind CSS | ADR-008 |
+| Frontend components | shadcn/ui | ADR-008 |
+| Frontend routing | React Router | ADR-008 |
+| Frontend server state | TanStack Query | ADR-008 |
 | Backend framework | FastAPI | ADR-002 |
 | Backend language | Python 3.11+ | ADR-002 |
 | Backend validation | Pydantic v2 | ADR-002 |

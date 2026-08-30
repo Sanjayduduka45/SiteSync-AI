@@ -20,17 +20,11 @@ Each ADR (Architectural Decision Record) contains:
 ## ADR-001 — Frontend Framework
 
 **Date**: 2026-08-30
-**Status**: Decided
+**Status**: Superseded by ADR-008
 
-**Context**: A frontend framework is needed for the SiteSync AI web application. The application is a professional data-intensive tool requiring strong TypeScript support, a mature component ecosystem, and server-side rendering capability.
+**Context**: A frontend framework is needed for the SiteSync AI web application.
 
-**Decision**: **Next.js** with the App Router, **TypeScript** in strict mode, **Tailwind CSS** for styling, and **shadcn/ui** as the component library.
-
-**Consequences**:
-- All frontend code is in TypeScript. No plain JavaScript files in the frontend.
-- App Router patterns are used. Pages Router is not used.
-- shadcn/ui is the only UI component library. Additional component libraries are not added without change control.
-- Tailwind CSS is the only styling mechanism. No CSS Modules, styled-components, or Emotion.
+**Decision**: ~~Next.js with the App Router~~ — superseded before any implementation. See ADR-008.
 
 ---
 
@@ -134,3 +128,24 @@ No AI output becomes an approved actual without explicit planner sign-off. The A
 - Future agents and developers must read `DEVELOPMENT_PHASES.md` before any implementation work.
 - Phase boundaries are enforced by human review, not automated tooling alone.
 - Git tags mark stable phase checkpoints.
+
+---
+
+## ADR-008 — Frontend Framework (Correction, supersedes ADR-001)
+
+**Date**: 2026-08-30
+**Status**: Decided
+
+**Context**: ADR-001 specified Next.js as the frontend framework. Before any implementation began, the product owner confirmed the final frontend stack. Next.js is not required; a Vite-based SPA is preferred for this product's architecture.
+
+**Decision**: **React** with **Vite**, **TypeScript** in strict mode, **Tailwind CSS** for styling, **shadcn/ui** as the component library, **React Router** for client-side routing, and **TanStack Query** for server state management.
+
+**Consequences**:
+- All frontend code is in TypeScript. No plain JavaScript files in the frontend.
+- Vite is the build tool and dev server. Next.js is not used.
+- React Router is the routing library. No file-system-based routing.
+- TanStack Query manages server state and API data fetching.
+- shadcn/ui is the only UI component library. Additional component libraries are not added without change control.
+- Tailwind CSS is the only styling mechanism. No CSS Modules, styled-components, or Emotion.
+- The frontend is a client-side SPA. Server-side rendering (SSR) is not part of the current architecture.
+- `NEXT_PUBLIC_` environment variable prefixes are not used. Vite uses `VITE_` prefix for client-exposed env vars.

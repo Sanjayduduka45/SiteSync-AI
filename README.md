@@ -16,7 +16,7 @@ Field Input → AI Extraction → Normalization → Schedule Matching
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui |
+| Frontend | React, TypeScript, Vite, Tailwind CSS, shadcn/ui, React Router, TanStack Query |
 | Backend | FastAPI, Python, Pydantic |
 | Platform | Supabase (PostgreSQL, Auth, Storage), pgvector |
 | AI | LangChain, Gemini, Embeddings, Whisper/STT |
