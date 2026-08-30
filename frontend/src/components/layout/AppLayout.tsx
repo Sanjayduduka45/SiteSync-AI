@@ -25,6 +25,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   const navLinks = [
     { label: 'Foundation Status', path: '/' },
+    { label: 'Field Inputs', path: '/inputs' },
     { label: 'Field Reports', path: '/reports' },
     { label: 'Field Events', path: '/events' },
   ]

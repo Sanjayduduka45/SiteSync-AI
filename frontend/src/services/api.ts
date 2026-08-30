@@ -77,6 +77,21 @@ export async function apiPost<T>(path: string, payload: unknown): Promise<T> {
 }
 
 /**
+ * Perform a multipart/form-data POST request against the backend API (for file uploads).
+ */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const authHeader = await getAuthHeader()
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...authHeader,
+    },
+    body: formData,
+  })
+  return handleResponse<T>(response)
+}
+
+/**
  * Perform a PATCH request against the backend API.
  */
 export async function apiPatch<T>(path: string, payload: unknown): Promise<T> {

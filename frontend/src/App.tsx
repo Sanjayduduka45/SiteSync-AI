@@ -14,6 +14,7 @@ import LoginPage from '@/pages/LoginPage'
 import StatusPage from '@/pages/StatusPage'
 import ReportsPage from '@/pages/ReportsPage'
 import EventsPage from '@/pages/EventsPage'
+import FieldInputsPage from '@/pages/FieldInputsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,16 @@ export default function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <EventsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/inputs"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <FieldInputsPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }
