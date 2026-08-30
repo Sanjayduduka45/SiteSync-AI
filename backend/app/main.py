@@ -4,7 +4,7 @@ SiteSync AI — FastAPI application factory.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import router as v1_router
@@ -32,6 +32,22 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type"],
     )
+
+    # Error handlers matching ARCHITECTURE.md format
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request, exc: HTTPException):
+        from fastapi.responses import JSONResponse
+        if isinstance(exc.detail, dict) and "error" in exc.detail:
+            content = exc.detail
+        else:
+            content = {
+                "error": {
+                    "code": "HTTP_" + str(exc.status_code),
+                    "message": str(exc.detail),
+                    "details": {},
+                }
+            }
+        return JSONResponse(status_code=exc.status_code, content=content)
 
     # Register API routers
     app.include_router(v1_router)

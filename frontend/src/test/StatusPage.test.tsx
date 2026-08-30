@@ -1,6 +1,6 @@
 /**
- * Phase 1 foundation test — StatusPage renders without errors.
- * Validates that React, TanStack Query, and React Router are correctly wired.
+ * Phase 1 & Phase 2 foundation test — StatusPage renders without errors.
+ * Validates that React, TanStack Query, React Router, and Auth are correctly wired.
  */
 
 import { render, screen } from '@testing-library/react'
@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect } from 'vitest'
 import StatusPage from '@/pages/StatusPage'
+import { AuthProvider } from '@/features/auth/AuthContext'
 
 function renderWithProviders(ui: React.ReactElement) {
   const client = new QueryClient({
@@ -15,7 +16,9 @@ function renderWithProviders(ui: React.ReactElement) {
   })
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
 }

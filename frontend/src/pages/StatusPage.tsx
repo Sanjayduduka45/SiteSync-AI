@@ -1,8 +1,8 @@
 /**
- * Status Page — Phase 1 foundation screen.
+ * Status Page — Phase 1 & Phase 2 foundation screen.
  *
- * Purpose: Verify that the frontend application bootstraps correctly and
- * can communicate with the backend health endpoint.
+ * Purpose: Verify that the frontend application bootstraps correctly,
+ * authenticates via Supabase Auth, and can communicate with the backend health endpoint.
  *
  * This is NOT the SiteSync application dashboard.
  * It will be replaced in a future phase.
@@ -10,8 +10,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { fetchHealth, healthQueryKey } from '@/features/health/api'
+import { useAuth } from '@/features/auth/useAuth'
+import { Button } from '@/components/ui/button'
 
 export default function StatusPage() {
+  const { user, signOut, isAuthenticated } = useAuth()
   const { data, isLoading, isError, error } = useQuery({
     queryKey: healthQueryKey,
     queryFn: fetchHealth,
@@ -21,15 +24,36 @@ export default function StatusPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">SiteSync AI</h1>
-          <p className="text-sm text-gray-500 mt-1">Phase 1 — Foundation Status</p>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">SiteSync AI</h1>
+            <p className="text-sm text-gray-500 mt-1">Phase 1 — Foundation Status</p>
+          </div>
+          {isAuthenticated && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => signOut()}
+              className="text-xs text-gray-600 hover:text-gray-900"
+            >
+              Sign out
+            </Button>
+          )}
         </div>
 
         <div className="space-y-4">
           <StatusRow label="Frontend" value="Running" status="ok" />
           <StatusRow label="React Router" value="Configured" status="ok" />
           <StatusRow label="TanStack Query" value="Configured" status="ok" />
+
+          {isAuthenticated && user && (
+            <div className="border-t border-gray-100 pt-4 space-y-2">
+              <StatusRow label="Auth State" value="Authenticated" status="ok" />
+              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 break-all">
+                <span className="font-semibold text-gray-700">User:</span> {user.email || user.id}
+              </div>
+            </div>
+          )}
 
           <div className="border-t border-gray-100 pt-4">
             {isLoading && (
@@ -53,7 +77,7 @@ export default function StatusPage() {
         </div>
 
         <p className="text-xs text-gray-400 mt-6">
-          This screen is temporary. It exists only to verify Phase 1 connectivity.
+          This screen is temporary. It exists only to verify foundation connectivity and authentication.
         </p>
       </div>
     </div>

@@ -52,7 +52,7 @@ All significant changes are recorded here, organized by phase.
 **Frontend**
 - `frontend/` — React + Vite + TypeScript SPA initialized
 - `frontend/vite.config.ts` — Tailwind CSS (`@tailwindcss/vite`), path alias (`@/`), dev proxy to backend, Vitest configuration
-- `frontend/src/index.css` — Tailwind v4 import
+- `frontend/src/index.css` — Tailwind v4 import and shadcn theme variables
 - `frontend/src/main.tsx` — Application entry point (StrictMode)
 - `frontend/src/App.tsx` — QueryClientProvider + BrowserRouter + Routes
 - `frontend/src/pages/StatusPage.tsx` — Phase 1 foundation status screen
@@ -61,7 +61,6 @@ All significant changes are recorded here, organized by phase.
 - `frontend/src/test/setup.ts` — Vitest setup (jest-dom)
 - `frontend/src/test/StatusPage.test.tsx` — StatusPage unit tests (4 tests)
 - `frontend/.env.example` — Frontend environment variable template (`VITE_*`)
-- Directory structure: `app/`, `pages/`, `components/ui/`, `components/domain/`, `features/`, `services/`, `hooks/`, `lib/`, `types/`, `test/`
 
 **Backend**
 - `backend/` — FastAPI + Python 3.13 + Pydantic v2 backend
@@ -78,36 +77,52 @@ All significant changes are recorded here, organized by phase.
 **Root**
 - `dev.sh` — Development startup script (starts both servers)
 
+---
+
+## Phase 2 — Authentication & Authorization
+
+**Date**: 2026-08-30
+**Status**: Complete
+
+### Added
+
+**Database & RLS**
+- `supabase/migrations/20260830000000_phase2_auth_foundation.sql` — PostgreSQL migration creating `profiles`, `projects`, `project_members`, `project_role` enum, automatic profile trigger, and explicit multi-tenant Row-Level Security (RLS) policies.
+- `docs/project-memory/DATABASE_SCHEMA.md` — Full database schema specification with column types, relationships, indices, RLS policies, and role hierarchy.
+
+**Backend**
+- `backend/app/core/auth.py` — Supabase JWT verification, server-side identity extraction, project membership resolution, and role hierarchy authorization.
+- `backend/app/schemas/auth.py` — Pydantic schemas for `UserIdentity`, `ProjectRole`, `ProjectMembershipSummary`, `AuthMeResponse`, `ProjectDetailResponse`, and `ApiErrorResponse`.
+- `backend/app/api/v1/routers/auth.py` — `GET /api/v1/auth/me`, `GET /api/v1/projects/{project_id}`, `POST /api/v1/projects/{project_id}/admin-check`.
+- `backend/tests/test_auth.py` — 9 tests covering token validation, 401 unauthenticated, 403 cross-project access/IDOR prevention, and role hierarchy.
+- `backend/tests/test_rls_policies.py` — 4 tests validating SQL migration RLS constraints and anti-permissive policy checks.
+
+**Frontend**
+- `frontend/src/lib/supabase.ts` — Client-safe Supabase instance initialization with graceful fallback.
+- `frontend/src/features/auth/` — `types.ts`, `context.ts`, `AuthContext.tsx`, `useAuth.ts` for session persistence and auth state management.
+- `frontend/src/components/auth/ProtectedRoute.tsx` — Client-side route guard with session loading spinner and redirect to `/login`.
+- `frontend/src/pages/LoginPage.tsx` — Light-theme sign in form using existing design system tokens and shadcn Button.
+- `frontend/src/pages/StatusPage.tsx` — Updated to display authenticated user profile and sign-out action while preserving Phase 1 connectivity indicators.
+- `frontend/src/services/api.ts` — Automatically attaches Bearer JWT token to API requests.
+- `frontend/src/test/LoginPage.test.tsx` (5 tests)
+- `frontend/src/test/ProtectedRoute.test.tsx` (3 tests)
+- `frontend/src/test/AuthContext.test.tsx` (3 tests)
+
 ### Test Results
 
 | Suite | Tests | Result |
 |---|---|---|
-| Frontend (Vitest) | 4 | ✅ All pass |
-| Backend (pytest) | 5 | ✅ All pass |
-| TypeScript check | — | ✅ Pass |
-| Production build | — | ✅ Pass |
+| Frontend (Vitest) | 15 | ✅ All pass |
+| Backend (pytest) | 18 | ✅ All pass |
+| TypeScript check (`npm run typecheck`) | — | ✅ Pass (0 errors) |
+| Frontend build (`npm run build`) | — | ✅ Pass |
+| Frontend lint (`oxlint`) | — | ✅ Pass (0 errors) |
 
 ### Not Implemented (by design)
 
-- No authentication
-- No authorization
 - No dashboard
-- No database schema
-- No AI components
-- No product features
-
----
-
-## Phase 2 — Authentication
-
-> Not yet started.
-
----
-
-## Phase 2 — Authentication
-
-> Not yet started.
-
----
-
-*Future entries will be added here as phases are completed.*
+- No project management UI
+- No schedule import
+- No file upload
+- No AI pipeline
+- No social logins / MFA
