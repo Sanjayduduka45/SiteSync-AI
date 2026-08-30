@@ -1,14 +1,15 @@
 # DATABASE SCHEMA — SiteSync AI
 
 > Database platform: **Supabase PostgreSQL** with **pgvector**
-> Current active phase: **Phase 2 — Authentication + Authorization Foundation**
+> Current active phase: **Phase 3 — Project Reports and Field Events Foundation**
 
 ---
 
 ## Overview
 
 SiteSync AI enforces multi-tenant project isolation using explicit PostgreSQL Row-Level Security (RLS) policies.
-Phase 2 establishes the identity, project, and membership boundary.
+Phase 2 established identity, projects, and membership. Phase 3 establishes the primary domain hierarchy:
+`Project → Reports → Field Events`.
 
 ---
 
@@ -22,10 +23,24 @@ CREATE TYPE project_role AS ENUM ('admin', 'planner', 'supervisor', 'viewer');
 ```
 
 Role Hierarchy:
-1. `admin`: Full project administrative privileges (members, project settings, all project data).
-2. `planner`: Schedule management, AI match review, variance analysis, plan-vs-actual approval.
-3. `supervisor`: Field input review, site activity tracking, progress submission review.
-4. `viewer`: Read-only access to authorized project data.
+1. `admin` (40): Full project administrative privileges (members, reports deletion, event management).
+2. `planner` (30): Report viewing & upload, field event creation & editing.
+3. `supervisor` (20): Report viewing & upload, field event creation.
+4. `viewer` (10): Read-only access to authorized project data.
+
+### `report_status`
+Tracks file processing status for uploaded field documents.
+
+```sql
+CREATE TYPE report_status AS ENUM ('uploaded', 'processing', 'processed', 'failed');
+```
+
+### `field_event_status`
+Tracks structured field progress event lifecycle.
+
+```sql
+CREATE TYPE field_event_status AS ENUM ('pending', 'processed', 'matched', 'needs_review', 'approved', 'rejected');
+```
 
 ---
 
@@ -42,14 +57,6 @@ User profile information linked directly to `auth.users`.
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Last update timestamp |
 
-**Indices:**
-- `idx_profiles_email` ON `email`
-
-**RLS Policies:**
-- **SELECT**: Users can read their own profile or profiles of members sharing a mutual project.
-- **UPDATE**: Users can update their own profile only (`auth.uid() = id`).
-- **INSERT/DELETE**: Restricted; managed via automated trigger on `auth.users`.
-
 ---
 
 ### 2. `public.projects`
@@ -65,15 +72,6 @@ Project registry and metadata.
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Last update timestamp |
 
-**Indices:**
-- `idx_projects_code` ON `code`
-
-**RLS Policies:**
-- **SELECT**: Only users with an active record in `project_members` for this project.
-- **INSERT**: Authenticated users can create a project (`created_by = auth.uid()`).
-- **UPDATE**: Only project members with `role = 'admin'`.
-- **DELETE**: Only project members with `role = 'admin'`.
-
 ---
 
 ### 3. `public.project_members`
@@ -88,23 +86,76 @@ Many-to-many relationship defining user membership and role within each project.
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Joined timestamp |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Last updated timestamp |
 
-**Constraints:**
-- `uq_project_members_project_user`: `UNIQUE(project_id, user_id)`
+---
+
+### 4. `public.reports` (Phase 3)
+Field reports, site diaries, and progress documents submitted to a project.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `UUID` | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique report identifier |
+| `project_id` | `UUID` | `NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE` | Associated project ID |
+| `name` | `TEXT` | `NOT NULL` | User-assigned report title |
+| `file_name` | `TEXT` | `NOT NULL` | Original filename |
+| `file_type` | `TEXT` | `NOT NULL` | MIME / file extension (pdf, xlsx, csv, txt) |
+| `file_size` | `INTEGER` | `NOT NULL DEFAULT 0` | Size in bytes |
+| `source` | `TEXT` | `NOT NULL DEFAULT 'manual_upload'` | Ingestion source |
+| `status` | `report_status` | `NOT NULL DEFAULT 'uploaded'` | Processing state |
+| `uploaded_by` | `UUID` | `REFERENCES public.profiles(id) ON DELETE SET NULL` | Submitter profile ID |
+| `uploaded_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Upload timestamp |
+| `processed_at` | `TIMESTAMPTZ` | `NULL` | Processing completion timestamp |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Record creation timestamp |
+| `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Record modification timestamp |
 
 **Indices:**
-- `idx_project_members_user_id` ON `user_id`
-- `idx_project_members_project_id` ON `project_id`
+- `idx_reports_project_id` ON `project_id`
+- `idx_reports_uploaded_by` ON `uploaded_by`
+- `idx_reports_status` ON `status`
 
 **RLS Policies:**
-- **SELECT**: Members can view member lists of projects they belong to.
-- **INSERT**: Only project members with `role = 'admin'` for that project.
-- **UPDATE**: Only project members with `role = 'admin'` for that project.
-- **DELETE**: Only project members with `role = 'admin'` for that project.
+- **SELECT**: Project members (`viewer` and above) can view all project reports.
+- **INSERT**: `supervisor`, `planner`, and `admin` roles can upload reports.
+- **UPDATE**: `planner` and `admin` roles can update reports.
+- **DELETE**: `admin` role only.
+
+---
+
+### 5. `public.field_events` (Phase 3)
+Structured construction progress events extracted from reports or recorded from site.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | `UUID` | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique field event identifier |
+| `project_id` | `UUID` | `NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE` | Associated project ID |
+| `report_id` | `UUID` | `REFERENCES public.reports(id) ON DELETE SET NULL` | Source report reference |
+| `event_type` | `TEXT` | `NOT NULL` | Category (e.g. Spool Erection, Concrete Pour) |
+| `description` | `TEXT` | `NOT NULL` | Description of physical work performed |
+| `discipline` | `TEXT` | `NOT NULL` | Construction trade (Piping, Civil, Electrical, etc.) |
+| `location` | `TEXT` | `NOT NULL` | Area / Grid / Unit location |
+| `event_date` | `DATE` | `NOT NULL` | Date when event occurred on site |
+| `progress_percent` | `NUMERIC(5,2)`| `NOT NULL DEFAULT 0.00 CHECK (0 <= progress_percent <= 100)` | Work percentage |
+| `status` | `field_event_status` | `NOT NULL DEFAULT 'pending'` | Extraction / decision lifecycle status |
+| `extracted_by` | `UUID` | `REFERENCES public.profiles(id) ON DELETE SET NULL` | Author / extractor ID |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Record creation timestamp |
+| `updated_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT timezone('utc', now())` | Record modification timestamp |
+
+**Indices:**
+- `idx_field_events_project_id` ON `project_id`
+- `idx_field_events_report_id` ON `report_id`
+- `idx_field_events_discipline` ON `discipline`
+- `idx_field_events_event_date` ON `event_date`
+- `idx_field_events_status` ON `status`
+
+**RLS Policies:**
+- **SELECT**: Project members (`viewer` and above) can view project field events.
+- **INSERT**: `supervisor`, `planner`, and `admin` roles can create field events.
+- **UPDATE**: `planner` and `admin` roles can update field events.
+- **DELETE**: `admin` role only.
 
 ---
 
 ## Security Invariants
 
-1. No table in `public` schema may have RLS disabled.
-2. Cross-project data access is strictly prohibited by RLS and API middleware.
+1. RLS is mandatory on all tables in `public`.
+2. Cross-project data access is strictly prohibited at both API and database levels.
 3. Client-supplied role or user ID is never trusted by backend API operations.

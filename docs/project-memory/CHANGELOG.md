@@ -108,21 +108,56 @@ All significant changes are recorded here, organized by phase.
 - `frontend/src/test/ProtectedRoute.test.tsx` (3 tests)
 - `frontend/src/test/AuthContext.test.tsx` (3 tests)
 
+---
+
+## Phase 3 — Project Reports and Field Events Foundation
+
+**Date**: 2026-08-30
+**Status**: Complete
+
+### Added
+
+**Database & RLS**
+- `supabase/migrations/20260830000001_phase3_reports_and_events.sql` — PostgreSQL migration creating `reports` and `field_events` tables with foreign keys, cascade rules, indices, and multi-tenant RLS policies.
+- `docs/project-memory/DATABASE_SCHEMA.md` — Updated with complete tables, indices, and role permissions documentation for `reports` and `field_events`.
+
+**Backend**
+- `backend/app/schemas/reports.py` — Pydantic schemas for `ReportStatus`, `ReportCreate`, `ReportResponse`, and `ReportListResponse`.
+- `backend/app/schemas/events.py` — Pydantic schemas for `FieldEventStatus`, `FieldEventCreate`, `FieldEventUpdate`, `FieldEventResponse`, and `FieldEventListResponse`.
+- `backend/app/services/report_service.py` — Domain service handling project-scoped report CRUD and initial demo dataset.
+- `backend/app/services/event_service.py` — Domain service handling field events lifecycle, report linking, and progress percentage constraints (0..100%).
+- `backend/app/api/v1/routers/reports.py` — `GET`, `POST` (Supervisor+), `DELETE` (Admin) `/api/v1/projects/{project_id}/reports`.
+- `backend/app/api/v1/routers/events.py` — `GET`, `POST` (Supervisor+), `PATCH` (Planner+) `/api/v1/projects/{project_id}/events`.
+- `backend/tests/test_reports.py` — 8 tests covering report listing, creation, admin deletion, viewer/outsider restrictions, and unauthenticated handling.
+- `backend/tests/test_events.py` — 7 tests covering event listing, supervisor creation, planner patch, supervisor patch denial, viewer restriction, progress validation, and IDOR prevention.
+- `backend/tests/test_project_isolation.py` — 4 cross-tenant boundary tests for reports and field events.
+- `backend/tests/test_rls_policies.py` — Updated to validate Phase 3 migration syntax and RLS policies.
+
+**Frontend**
+- `frontend/src/features/projects/` — `types.ts`, `context.ts`, `ProjectContext.tsx`, `useProject.ts` for active project state management and role propagation.
+- `frontend/src/features/reports/` — `types.ts`, `api.ts` for report operations.
+- `frontend/src/features/events/` — `types.ts`, `api.ts` for field event operations.
+- `frontend/src/components/layout/AppLayout.tsx` — Shell with top navigation, brand identity, interactive project switcher dropdown, role badge, and session controls.
+- `frontend/src/pages/ReportsPage.tsx` — Project-scoped reports listing, report upload modal prototype (PDF, XLSX, CSV, TXT), search & status filtering, and slide-over report details drawer showing linked field events.
+- `frontend/src/pages/EventsPage.tsx` — Project-scoped field events table with progress bars, create event modal, search, discipline & status filters, and event detail drawer with locked future AI placeholders.
+- `frontend/src/services/api.ts` — Enhanced with `apiPost`, `apiPatch`, `apiDelete` methods.
+- `frontend/src/test/ProjectContext.test.tsx` (2 tests)
+- `frontend/src/test/ReportsPage.test.tsx` (4 tests)
+- `frontend/src/test/EventsPage.test.tsx` (4 tests)
+
 ### Test Results
 
 | Suite | Tests | Result |
 |---|---|---|
-| Frontend (Vitest) | 15 | ✅ All pass |
-| Backend (pytest) | 18 | ✅ All pass |
+| Frontend (Vitest) | 25 | ✅ All pass |
+| Backend (pytest) | 37 | ✅ All pass |
 | TypeScript check (`npm run typecheck`) | — | ✅ Pass (0 errors) |
 | Frontend build (`npm run build`) | — | ✅ Pass |
 | Frontend lint (`oxlint`) | — | ✅ Pass (0 errors) |
 
 ### Not Implemented (by design)
 
-- No dashboard
-- No project management UI
-- No schedule import
-- No file upload
-- No AI pipeline
-- No social logins / MFA
+- No AI extraction pipeline or LLM processing (planned for future phase)
+- No schedule matching or schedule intelligence algorithms (planned for future phase)
+- No risk detection engine or dashboard analytics (planned for future phase)
+- No S3 / GCS cloud blob upload endpoints (metadata prototype for Phase 3)

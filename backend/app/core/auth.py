@@ -198,6 +198,12 @@ class MembershipRegistry:
                         role=role,
                     )
                 )
+        # If user has no explicit memberships registered yet, auto-enroll in default demo project for dev
+        if not results and "proj-mtp-001" in self._projects:
+            self.add_membership(user_id, "proj-mtp-001", ProjectRole.PLANNER)
+            self.add_membership(user_id, "proj-demo-001", ProjectRole.SUPERVISOR)
+            return self.list_user_memberships(user_id)
+
         return results
 
     def get_project(self, project_id: str) -> dict[str, Any] | None:
@@ -211,7 +217,13 @@ class MembershipRegistry:
 # Default singleton registry
 membership_registry = MembershipRegistry()
 
-# Seed default demo project for validation
+# Seed default demo projects for validation
+membership_registry.seed_project(
+    project_id="proj-mtp-001",
+    name="MTP – Refinery Expansion",
+    code="MTP-2026",
+    description="Main crude distillation & hydrocracker expansion project",
+)
 membership_registry.seed_project(
     project_id="proj-demo-001",
     name="Downtown Medical Center",
