@@ -1,6 +1,7 @@
 /**
  * Frontend tests for FieldInputsPage.
- * Validates input feed rendering, text submission, type filtering, detail drawer, and role restrictions.
+ * Validates input feed rendering, text submission, type filtering, detail drawer,
+ * role restrictions, and Phase 5 AI extraction status / triggers.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -10,7 +11,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import FieldInputsPage from '@/pages/FieldInputsPage'
 import { ProjectContext } from '@/features/projects/ProjectContext'
 import * as inputsApi from '@/features/inputs/api'
+import * as extractionsApi from '@/features/extractions/api'
 import type { FieldInput } from '@/features/inputs/types'
+import type { ExtractionRecord } from '@/features/extractions/types'
 
 const mockProjectValue = {
   projects: [
@@ -78,6 +81,37 @@ const mockInputs: FieldInput[] = [
   },
 ]
 
+const mockExtractions: ExtractionRecord[] = [
+  {
+    id: 'ext-01',
+    project_id: 'proj-mtp-001',
+    field_input_id: 'inp-01',
+    status: 'completed',
+    extracted_data: {
+      raw_input_id: 'inp-01',
+      extracted_activities: [
+        {
+          description: 'Completed 4 spools in Rack 3',
+          progress_value: 4,
+          progress_unit: 'spools',
+          discipline: 'Piping',
+          location: 'Rack 3',
+          event_date: '2026-08-30',
+          constraints: [],
+          evidence_tokens: ['Completed 4 spools in Rack 3'],
+        },
+      ],
+      extraction_confidence: 0.95,
+      model_version: 'gemini-1.5-flash:extraction_v1',
+    },
+    confidence_score: 0.95,
+    model_version: 'gemini-1.5-flash:extraction_v1',
+    error_message: null,
+    created_at: '2026-08-30T10:05:00Z',
+    updated_at: '2026-08-30T10:05:00Z',
+  },
+]
+
 function renderFieldInputsPage(projectOverrides = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -100,9 +134,17 @@ describe('FieldInputsPage', () => {
       inputs: mockInputs,
       total: 2,
     })
+    vi.spyOn(extractionsApi, 'getProjectExtractions').mockResolvedValue({
+      extractions: mockExtractions,
+      total: 1,
+    })
+    vi.spyOn(extractionsApi, 'getInputExtractions').mockResolvedValue({
+      extractions: mockExtractions,
+      total: 1,
+    })
   })
 
-  it('renders page header and input feed cards', async () => {
+  it('renders page header and input feed cards with extraction status', async () => {
     renderFieldInputsPage()
 
     expect(screen.getByText('Field Inputs')).toBeInTheDocument()
@@ -111,6 +153,10 @@ describe('FieldInputsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Daily Morning Shift Notes')).toBeInTheDocument()
       expect(screen.getByText('Compressor Loop Audio Debrief')).toBeInTheDocument()
+      // Card 1 has extraction -> Extracted badge
+      expect(screen.getByText(/Extracted \(95%\)/i)).toBeInTheDocument()
+      // Card 2 has no extraction -> Unprocessed badge
+      expect(screen.getByText('Unprocessed')).toBeInTheDocument()
     })
   })
 
@@ -158,7 +204,7 @@ describe('FieldInputsPage', () => {
     })
   })
 
-  it('opens detail drawer when clicking an input card', async () => {
+  it('opens detail drawer and displays extraction results', async () => {
     renderFieldInputsPage()
 
     await waitFor(() => {
@@ -169,8 +215,31 @@ describe('FieldInputsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('ID: inp-01')).toBeInTheDocument()
-      expect(screen.getByText('Submitted At:')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+      expect(screen.getByText(/AI Progress Extraction/i)).toBeInTheDocument()
+      expect(screen.getByText('High · 95%')).toBeInTheDocument()
+      expect(screen.getByText('Completed 4 spools in Rack 3')).toBeInTheDocument()
+    })
+  })
+
+  it('allows planner to re-run extraction from drawer', async () => {
+    const triggerSpy = vi.spyOn(extractionsApi, 'triggerExtraction').mockResolvedValue(mockExtractions[0])
+
+    renderFieldInputsPage({ currentRole: 'planner' })
+
+    await waitFor(() => {
+      expect(screen.getByText('Daily Morning Shift Notes')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByText('Daily Morning Shift Notes'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Re-run Extraction/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Re-run Extraction/i }))
+
+    await waitFor(() => {
+      expect(triggerSpy).toHaveBeenCalledWith('proj-mtp-001', 'inp-01')
     })
   })
 

@@ -15,6 +15,11 @@ import StatusPage from '@/pages/StatusPage'
 import ReportsPage from '@/pages/ReportsPage'
 import EventsPage from '@/pages/EventsPage'
 import FieldInputsPage from '@/pages/FieldInputsPage'
+import SchedulePage from '@/pages/SchedulePage'
+import ApprovedActualsPage from '@/pages/ApprovedActualsPage'
+import VarianceDashboardPage from '@/pages/VarianceDashboardPage'
+import RiskDashboardPage from '@/pages/RiskDashboardPage'
+import AuditPage from '@/pages/AuditPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,6 +74,56 @@ export default function App() {
                   <ProtectedRoute>
                     <AppLayout>
                       <FieldInputsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/schedule"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <SchedulePage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/actuals"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <ApprovedActualsPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/variance"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <VarianceDashboardPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/risks"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <RiskDashboardPage />
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <AuditPage />
                     </AppLayout>
                   </ProtectedRoute>
                 }

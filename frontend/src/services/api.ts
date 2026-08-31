@@ -121,3 +121,30 @@ export async function apiDelete<T>(path: string): Promise<T> {
   })
   return handleResponse<T>(response)
 }
+
+/**
+ * Perform an authenticated GET request against the backend API to download a binary/blob payload.
+ */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename?: string }> {
+  const authHeader = await getAuthHeader()
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers: {
+      ...authHeader,
+    },
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorResponse | null
+    throw new Error(body?.error?.message ?? `API error: ${response.status}`)
+  }
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let filename: string | undefined
+  if (contentDisposition) {
+    const match = /filename=["']?([^"';]+)["']?/i.exec(contentDisposition)
+    if (match && match[1]) {
+      filename = match[1]
+    }
+  }
+  const blob = await response.blob()
+  return { blob, filename }
+}

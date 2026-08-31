@@ -1,6 +1,7 @@
 /**
  * FieldInputsPage — Primary multi-modal field input capture and feed interface.
  * Route: /inputs
+ * Phase 5: Displays AI extraction status on feed cards and connects to InputDetailDrawer.
  */
 
 import { useState } from 'react'
@@ -8,6 +9,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { useProject } from '@/features/projects/useProject'
 import { deleteFieldInput, fetchFieldInputs } from '@/features/inputs/api'
+import { getProjectExtractions } from '@/features/extractions/api'
+import type { ExtractionRecord } from '@/features/extractions/types'
 import type { FieldInput, FieldInputType } from '@/features/inputs/types'
 import { TextInputForm } from '@/features/inputs/components/TextInputForm'
 import { VoiceRecorder } from '@/features/inputs/components/VoiceRecorder'
@@ -44,10 +47,26 @@ export default function FieldInputsPage() {
     enabled: Boolean(selectedProjectId),
   })
 
+  // Fetch project-level extractions to decorate feed cards without N+1 requests
+  const { data: projectExtractionsData } = useQuery({
+    queryKey: ['project-extractions', selectedProjectId],
+    queryFn: () => getProjectExtractions(selectedProjectId!),
+    enabled: Boolean(selectedProjectId),
+  })
+
+  const extractionsByInputId = (projectExtractionsData?.extractions ?? []).reduce<Record<string, ExtractionRecord>>(
+    (acc, ext) => {
+      acc[ext.field_input_id] = ext
+      return acc
+    },
+    {}
+  )
+
   const deleteMutation = useMutation({
     mutationFn: (inputId: string) => deleteFieldInput(selectedProjectId!, inputId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['field-inputs', selectedProjectId] })
+      queryClient.invalidateQueries({ queryKey: ['project-extractions', selectedProjectId] })
       if (selectedInput) {
         setSelectedInput(null)
       }
@@ -198,6 +217,8 @@ export default function FieldInputsPage() {
               style: 'bg-gray-50 text-gray-700 border-gray-200',
             }
 
+            const extraction = extractionsByInputId[input.id]
+
             return (
               <div
                 key={input.id}
@@ -206,26 +227,51 @@ export default function FieldInputsPage() {
               >
                 <div>
                   {/* Top Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-2">
                     <span
                       className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${config.style}`}
                     >
                       <span>{config.icon}</span> {config.label}
                     </span>
 
-                    {input.input_type === 'voice' && (
-                      <span
-                        className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
-                          input.transcription_status === 'completed'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : input.transcription_status === 'failed'
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}
-                      >
-                        {input.transcription_status}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {input.input_type === 'voice' && (
+                        <span
+                          className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${
+                            input.transcription_status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : input.transcription_status === 'failed'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}
+                        >
+                          {input.transcription_status}
+                        </span>
+                      )}
+
+                      {/* AI Extraction Status Badge */}
+                      {extraction?.status === 'completed' ? (
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1">
+                          <span>✨</span> Extracted{' '}
+                          {extraction.confidence_score !== null
+                            ? `(${Math.round(extraction.confidence_score * 100)}%)`
+                            : ''}
+                        </span>
+                      ) : extraction?.status === 'pending' ? (
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Extracting…
+                        </span>
+                      ) : extraction?.status === 'failed' ? (
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded border bg-red-50 text-red-700 border-red-200">
+                          Extraction Failed
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-gray-500 px-1.5 py-0.5 rounded border bg-gray-50 border-gray-200">
+                          Unprocessed
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Title & snippet */}

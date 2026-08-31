@@ -26,9 +26,16 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navLinks = [
     { label: 'Foundation Status', path: '/' },
     { label: 'Field Inputs', path: '/inputs' },
+    { label: 'Schedule', path: '/schedule' },
+    { label: 'Approved Actuals', path: '/actuals' },
+    { label: 'Plan vs Actual', path: '/variance' },
+    { label: 'Risk & Critical Path', path: '/risks' },
+    { label: 'Audit Trail', path: '/audit' },
     { label: 'Field Reports', path: '/reports' },
     { label: 'Field Events', path: '/events' },
   ]
+
+
 
   const roleColors: Record<string, string> = {
     admin: 'bg-red-50 text-red-700 border-red-200',

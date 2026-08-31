@@ -1,8 +1,13 @@
 /**
- * InputDetailDrawer — Slide-over drawer displaying raw field input details, media, and transcription.
+ * InputDetailDrawer — Slide-over drawer displaying raw field input details, media,
+ * transcription, and Phase 5 AI Extraction results.
  */
 
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { getInputExtractions, triggerExtraction } from '@/features/extractions/api'
+import { ExtractionResultView } from '@/features/extractions/components/ExtractionResultView'
 import type { FieldInput } from '../types'
 
 interface InputDetailDrawerProps {
@@ -20,7 +25,40 @@ export function InputDetailDrawer({
   onDelete,
   isDeleting,
 }: InputDetailDrawerProps) {
+  const queryClient = useQueryClient()
+  const [extractError, setExtractError] = useState<string | null>(null)
+
+  const canExtract = currentRole === 'supervisor' || currentRole === 'planner' || currentRole === 'admin'
+
+  const projectId = input?.project_id || ''
+  const inputId = input?.id || ''
+
+  const {
+    data: extractionsData,
+    isLoading: isExtractionsLoading,
+    refetch: refetchExtractions,
+  } = useQuery({
+    queryKey: ['input-extractions', projectId, inputId],
+    queryFn: () => getInputExtractions(projectId, inputId),
+    enabled: Boolean(projectId && inputId),
+  })
+
+  const extractMutation = useMutation({
+    mutationFn: () => triggerExtraction(projectId, inputId),
+    onMutate: () => setExtractError(null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['input-extractions', projectId, inputId] })
+      queryClient.invalidateQueries({ queryKey: ['project-extractions', projectId] })
+      refetchExtractions()
+    },
+    onError: (err: Error) => {
+      setExtractError(err.message || 'Failed to trigger AI extraction.')
+    },
+  })
+
   if (!input) return null
+
+  const latestExtraction = extractionsData?.extractions?.[0] || null
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B'
@@ -53,6 +91,8 @@ export function InputDetailDrawer({
     icon: '📄',
     style: 'bg-gray-50 text-gray-700 border-gray-200',
   }
+
+  const isExtracting = extractMutation.isPending || latestExtraction?.status === 'pending'
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/30 backdrop-blur-xs">
@@ -205,6 +245,90 @@ export function InputDetailDrawer({
               )}
             </div>
           )}
+
+          {/* Phase 5: AI Extraction Results Section */}
+          <div className="pt-4 border-t border-gray-200 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
+                <span>🤖</span> AI Progress Extraction
+              </h3>
+              {latestExtraction?.status === 'completed' && canExtract && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => extractMutation.mutate()}
+                  disabled={isExtracting}
+                  className="text-[11px] h-7 px-2"
+                >
+                  {isExtracting ? 'Re-extracting…' : 'Re-run Extraction'}
+                </Button>
+              )}
+            </div>
+
+            {extractError && (
+              <div className="bg-red-50 border border-red-200 p-3 rounded-lg text-xs text-red-700">
+                <p className="font-semibold">Extraction error</p>
+                <p className="mt-0.5">{extractError}</p>
+              </div>
+            )}
+
+            {isExtractionsLoading ? (
+              <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                <div className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-900 border-t-transparent mb-2" />
+                <p className="text-xs text-gray-500">Checking extraction status…</p>
+              </div>
+            ) : isExtracting ? (
+              <div className="p-6 bg-amber-50/60 rounded-lg border border-amber-200 text-center space-y-2">
+                <div className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-amber-700 border-t-transparent" />
+                <p className="text-xs font-semibold text-amber-900">Extraction in progress…</p>
+                <p className="text-[11px] text-amber-700">
+                  Gemini is analyzing field progress and extracting structured activities.
+                </p>
+              </div>
+            ) : latestExtraction?.status === 'failed' ? (
+              <div className="p-4 bg-red-50 rounded-lg border border-red-200 space-y-3">
+                <div>
+                  <span className="text-xs font-bold text-red-800 block">Extraction Failed</span>
+                  <p className="text-xs text-red-600 mt-1">
+                    {latestExtraction.error_message || 'AI extraction could not be completed.'}
+                  </p>
+                </div>
+                {canExtract && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => extractMutation.mutate()}
+                    disabled={isExtracting}
+                    className="text-xs bg-white text-red-700 border-red-300 hover:bg-red-50"
+                  >
+                    Retry Extraction
+                  </Button>
+                )}
+              </div>
+            ) : latestExtraction?.status === 'completed' ? (
+              <ExtractionResultView extraction={latestExtraction} />
+            ) : (
+              <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center space-y-3">
+                <p className="text-xs text-gray-500">
+                  This input has not been processed by AI yet.
+                </p>
+                {canExtract ? (
+                  <Button
+                    size="sm"
+                    onClick={() => extractMutation.mutate()}
+                    disabled={isExtracting || !input.raw_text?.trim()}
+                    className="bg-gray-900 text-white hover:bg-gray-800 text-xs"
+                  >
+                    Run AI Extraction
+                  </Button>
+                ) : (
+                  <p className="text-[11px] text-gray-400 italic">
+                    AI extraction can be triggered by supervisors and planners.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Drawer Footer Actions */}

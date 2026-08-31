@@ -150,36 +150,63 @@
 
 ---
 
-## Phase 8 — Plan vs Actual + Variance (Planned)
+## Phase 8 — Plan vs Actual + Variance (COMPLETE — LOCKED)
 
-**Objective**: Compare approved actuals to schedule baseline.
+**Objective**: Compare approved actuals to schedule baseline deterministically.
 
-**Planned Scope**:
-- Plan vs actual calculation
-- Variance display (activity, WBS, project levels)
-- Variance flagging
+**Delivered Scope**:
+- **Phase 8.1 Pure Domain Engine**: Mathematical models (`ΔQ = Actual - Planned`, `P% = (Actual / Planned) * 100` unclamped, `ΔT = Latest Actual Date - Planned Finish Date`), unit compatibility, null handling, multi-actual cumulative sum, and status lifecycle (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `OVER_DELIVERED`, `UNQUANTIFIED`, `UNIT_MISMATCH`). See ADR-009, ADR-010, ADR-011.
+- **Phase 8.2 Read-Only FastAPI APIs**: `/api/v1/projects/{project_id}/variance/summary`, `/activities`, `/wbs` with project-level isolation, RBAC (all 4 roles read-only), server-side pagination, and error sanitization. See ADR-012, ADR-013.
+- **Phase 8.3 Plan vs Actual Dashboard**: Frontend KPI cards, homogeneous unit scope rollups, itemized activity variance table, WBS rollups, and filter bar.
+- **Phase 8.4 Security Audit & Lock**: 366 backend tests, 124 frontend tests, zero Phase 9 leaks, verified tenant isolation, 100% read-only enforcement.
 
----
-
-## Phase 9 — Risk and Impact (Planned)
-
-**Objective**: Surface risk from variance.
-
-**Planned Scope**:
-- Downstream impact assessment
-- Critical path risk surfacing
-- Risk display for PM role
 
 ---
 
-## Phase 10 — Audit and Reporting (Planned)
+## Phase 9 — Risk and Impact (COMPLETE — LOCKED)
 
-**Objective**: Audit trail and reporting.
+**Objective**: Surface risk, critical path vulnerability, and downstream impact from schedule baseline and verified variances deterministically.
 
-**Planned Scope**:
-- Audit log viewer
-- Basic exportable reports
-- Full audit trail per field input → decision
+**Canon & ADRs**:
+- **ADR-014**: Activity Dependency Data Foundation (`public.schedule_dependencies`, edge model, tenant integrity, cycle prevention).
+- **ADR-015**: Critical Path Method (CPM) Mathematical & Float Contract (inclusive duration, forward/backward pass for `FS`, `SS`, `FF`, `SF`, Total/Free Float, $TF \le 0$ criticality).
+- **ADR-016**: Downstream Impact & Factual Delay Traversal Contract (transitive DAG traversal, absorbed vs critical impact, factual slippage).
+- **ADR-017**: Deterministic Risk Intelligence & Severity Taxonomy (6-category taxonomy, discrete severity, composite 0–100 integer score).
+- **ADR-018**: Prediction, Heatmap & Presentation Boundary (exclusion of probabilistic AI forecasting, 2D Heatmap, PM dashboard).
+
+**Delivered Scope**:
+- **Phase 9.0**: Canon Lock & Decision Gate (COMPLETE)
+- **Phase 9.1**: Database Foundation Migration (`public.schedule_dependencies` with RLS) (COMPLETE)
+- **Phase 9.2**: Pure CPM & DAG Domain Engine (COMPLETE)
+- **Phase 9.3**: Downstream Impact & Float Erosion Service (COMPLETE)
+- **Phase 9.4**: Risk Intelligence & Severity Engine (COMPLETE)
+- **Phase 9.5**: FastAPI Network & Risk APIs (RBAC + Tenant Isolation) (COMPLETE)
+- **Phase 9.6**: Frontend Risk & Critical Path Intelligence UI (COMPLETE)
+- **Phase 9.7**: Adversarial Security & Concurrency Audit (COMPLETE)
+- **Phase 9.8**: Final Release Readiness & Lock (LOCKED)
+
+
+
+---
+
+## Phase 10 — Audit and Reporting (COMPLETE — LOCKED)
+
+**Objective**: Surface an immutable, end-to-end audit log of all project updates and human decisions, and provide exportable progress, variance, and risk reporting across the full field-to-schedule lifecycle.
+
+**Canon & ADRs**:
+- **ADR-019**: Phase 10 Export Formats & Serialization Contract (RFC 4180 CSV with formula injection escaping, strongly-typed JSON, deterministic dataset columns).
+- **ADR-020**: Phase 10 Audit Event Taxonomy & Immutability Contract (append-only unified audit event stream, strict update/delete prohibition, read-only RLS).
+- **ADR-021**: Phase 10 Audit Route & Provenance Presentation Contract (dedicated `/audit` route, step-by-step visual provenance lineage, direct export actions).
+
+**Delivered Scope**:
+- **Phase 10.0**: Canon Lock & Decision Gate (COMPLETE)
+- **Phase 10.1**: Audit & Provenance Domain Query Engine (COMPLETE)
+- **Phase 10.2**: Report Export Serialization Services (CSV / JSON) (COMPLETE)
+- **Phase 10.3**: FastAPI Audit & Export APIs (Tenant Isolation + RBAC) (COMPLETE)
+- **Phase 10.4**: Frontend Audit Log Viewer & Lineage Visualizer UI (COMPLETE)
+- **Phase 10.5**: Frontend Export Action Integration & Navigation (COMPLETE)
+- **Phase 10.6**: Adversarial Security, IDOR & Data Integrity Audit (COMPLETE)
+- **Phase 10.7**: Final Release Verification & Phase 10 Lock (COMPLETE — LOCKED)
 
 ---
 

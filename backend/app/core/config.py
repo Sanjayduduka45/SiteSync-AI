@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     database_url: str = ""
 
+    # AI / Gemini Configuration (Phase 5+)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-1.5-flash"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: str | list[str]) -> list[str]:

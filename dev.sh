@@ -26,6 +26,7 @@ cd "$ROOT_DIR/frontend"
 npm run dev &
 FRONTEND_PID=$!
 
+
 echo ""
 echo "  Backend:  http://localhost:8000"
 echo "  Frontend: http://localhost:3000"
