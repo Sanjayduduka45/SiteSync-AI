@@ -25,7 +25,7 @@ from app.schemas.schedule import (
 logger = logging.getLogger(__name__)
 
 # Canonical Google Embedding Configuration
-CANONICAL_EMBEDDING_MODEL = "models/text-embedding-004"
+CANONICAL_EMBEDDING_MODEL = "models/gemini-embedding-001"
 CANONICAL_EMBEDDING_DIMENSION = 768
 TASK_TYPE_DOCUMENT = "retrieval_document"
 TASK_TYPE_QUERY = "retrieval_query"

@@ -42,6 +42,12 @@ export function TextInputForm({ projectId, onSuccess, onCancel }: TextInputFormP
     e.preventDefault()
     setError(null)
 
+    // Hard guard: projectId must be a real project ID, not null/undefined.
+    if (!projectId || projectId === 'null' || projectId === 'undefined') {
+      setError('Please select a project before submitting.')
+      return
+    }
+
     if (!rawText.trim()) {
       setError('Field notes text is required and cannot be blank.')
       return

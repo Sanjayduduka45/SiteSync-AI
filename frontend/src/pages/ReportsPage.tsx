@@ -75,10 +75,12 @@ export default function ReportsPage() {
     enabled: Boolean(selectedProjectId && selectedReport?.id),
   })
 
-  // Upload mutation
+  // Upload mutation — projectId passed through payload to avoid stale closure.
   const uploadMutation = useMutation({
-    mutationFn: (payload: { name: string; file_name: string; file_type: string; file_size: number; source: string }) =>
-      createReport(selectedProjectId!, payload),
+    mutationFn: (payload: { projectId: string; name: string; file_name: string; file_type: string; file_size: number; source: string }) => {
+      const { projectId, ...rest } = payload
+      return createReport(projectId, rest)
+    },
     onSuccess: (newReport) => {
       queryClient.invalidateQueries({ queryKey: ['reports', selectedProjectId] })
       setIsUploadModalOpen(false)
@@ -92,9 +94,10 @@ export default function ReportsPage() {
     },
   })
 
-  // Delete mutation (Admin only)
+  // Delete mutation — projectId passed through payload to avoid stale closure.
   const deleteMutation = useMutation({
-    mutationFn: (reportId: string) => deleteReport(selectedProjectId!, reportId),
+    mutationFn: ({ projectId, reportId }: { projectId: string; reportId: string }) =>
+      deleteReport(projectId, reportId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reports', selectedProjectId] })
       if (selectedReport) {
@@ -107,6 +110,11 @@ export default function ReportsPage() {
     e.preventDefault()
     setUploadError(null)
 
+    // Hard guard: read selectedProjectId at submission time
+    if (!selectedProjectId) {
+      setUploadError('Please select a project before uploading.')
+      return
+    }
     if (!reportName.trim()) {
       setUploadError('Report name is required.')
       return
@@ -117,6 +125,7 @@ export default function ReportsPage() {
     }
 
     uploadMutation.mutate({
+      projectId: selectedProjectId,
       name: reportName.trim(),
       file_name: fileName.trim(),
       file_type: fileType,
@@ -505,7 +514,7 @@ export default function ReportsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => deleteMutation.mutate(selectedReport.id)}
+                  onClick={() => selectedProjectId && deleteMutation.mutate({ projectId: selectedProjectId, reportId: selectedReport.id })}
                   disabled={deleteMutation.isPending}
                   className="text-xs"
                 >

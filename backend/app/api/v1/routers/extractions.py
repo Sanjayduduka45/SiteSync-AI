@@ -143,6 +143,76 @@ async def trigger_extraction(
         )
 
 
+
+@router.post(
+    "/extractions/{extraction_id}",
+    response_model=ExtractionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Re-run AI extraction for a specific extraction record by ID",
+)
+async def rerun_extraction_by_id(
+    project_id: str,
+    extraction_id: str,
+    current_user: UserIdentity = Depends(get_current_user),
+) -> ExtractionResponse:
+    """
+    Re-runs structured AI extraction for an existing extraction record by looking up its associated field input.
+    Requires SUPERVISOR role or above.
+    """
+    _verify_membership(project_id, current_user, min_role=ProjectRole.SUPERVISOR)
+
+    extraction = await extraction_service.get_extraction(project_id, extraction_id)
+    if not extraction or str(extraction.project_id) != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=create_error_response("EXTRACTION_NOT_FOUND", f"Extraction '{extraction_id}' not found in project '{project_id}'"),
+        )
+
+    try:
+        return await extraction_service.extract_and_persist(
+            project_id=project_id,
+            field_input_id=str(extraction.field_input_id),
+        )
+    except ExtractionNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=create_error_response("INPUT_NOT_FOUND", f"Field input '{extraction.field_input_id}' not found in project '{project_id}'"),
+        )
+    except CrossProjectInputError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=create_error_response("INPUT_NOT_FOUND", f"Field input '{extraction.field_input_id}' not found in project '{project_id}'"),
+        )
+    except ExtractionInputError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=create_error_response("INVALID_INPUT", str(err)),
+        )
+    except EvidenceVerificationError as err:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=create_error_response("EVIDENCE_VERIFICATION_FAILED", str(err)),
+        )
+    except (GeminiProviderError, GeminiTimeoutError, GeminiExtractionParseError) as err:
+        logger.error(f"AI Provider failure during re-extraction: {err}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=create_error_response("AI_PROVIDER_ERROR", "AI extraction provider encountered a transient error. Please retry."),
+        )
+    except GeminiConfigurationError as err:
+        logger.critical(f"AI Configuration error: {err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response("INTERNAL_ERROR", "AI processing service is improperly configured."),
+        )
+    except Exception as err:
+        logger.error(f"Unexpected re-extraction error: {err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=create_error_response("INTERNAL_ERROR", "An unexpected error occurred during extraction processing."),
+        )
+
+
 @router.get(
     "/inputs/{input_id}/extractions",
     response_model=ExtractionListResponse,

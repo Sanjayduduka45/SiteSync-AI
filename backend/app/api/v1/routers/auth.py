@@ -40,7 +40,7 @@ async def get_me(
     Returns the authenticated user's profile identity and list of authorized project memberships.
     Server derives identity solely from the validated JWT token.
     """
-    memberships = membership_registry.list_user_memberships(current_user.id)
+    memberships = membership_registry.list_user_memberships(current_user.id, current_user.email)
     return AuthMeResponse(
         user=current_user,
         memberships=memberships,
@@ -67,7 +67,7 @@ async def get_project_details(
             detail=create_error_response("PROJECT_NOT_FOUND", f"Project '{project_id}' not found"),
         )
 
-    membership = membership_registry.get_user_membership(current_user.id, project_id)
+    membership = membership_registry.get_user_membership(current_user.id, project_id, current_user.email)
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -104,7 +104,7 @@ async def admin_role_check(
             detail=create_error_response("PROJECT_NOT_FOUND", f"Project '{project_id}' not found"),
         )
 
-    membership = membership_registry.get_user_membership(current_user.id, project_id)
+    membership = membership_registry.get_user_membership(current_user.id, project_id, current_user.email)
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

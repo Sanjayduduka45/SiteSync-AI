@@ -105,7 +105,8 @@ class AIExtractionRepository:
                     resp = await client.get(url, headers=self._get_supabase_headers(), params=params)
                     if resp.status_code == 200:
                         rows = resp.json()
-                        return rows[0] if rows else None
+                        if rows:
+                            return rows[0]
             except Exception as err:
                 logger.error(f"Failed to query public.ai_extractions via Supabase REST: {err}")
 
@@ -131,7 +132,8 @@ class AIExtractionRepository:
                     resp = await client.get(url, headers=self._get_supabase_headers(), params=params)
                     if resp.status_code == 200:
                         rows = resp.json()
-                        return rows[0] if rows else None
+                        if rows:
+                            return rows[0]
             except Exception as err:
                 logger.error(f"Failed to query public.ai_extractions via Supabase REST: {err}")
 

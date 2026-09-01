@@ -70,9 +70,11 @@ export default function EventsPage() {
     enabled: Boolean(selectedProjectId && isCreateModalOpen),
   })
 
-  // Create mutation
+  // Create mutation — projectId is passed through the payload so the
+  // submit handler reads the live context value at call time.
   const createMutation = useMutation({
     mutationFn: (payload: {
+      projectId: string
       report_id?: string | null
       event_type: string
       description: string
@@ -80,7 +82,10 @@ export default function EventsPage() {
       location: string
       event_date: string
       progress_percent: number
-    }) => createEvent(selectedProjectId!, payload),
+    }) => {
+      const { projectId, ...rest } = payload
+      return createEvent(projectId, rest)
+    },
     onSuccess: (newEvent) => {
       queryClient.invalidateQueries({ queryKey: ['events', selectedProjectId] })
       setIsCreateModalOpen(false)
@@ -99,6 +104,11 @@ export default function EventsPage() {
     e.preventDefault()
     setFormError(null)
 
+    // Hard guard: read selectedProjectId at submission time
+    if (!selectedProjectId) {
+      setFormError('Please select a project before submitting.')
+      return
+    }
     if (!description.trim()) {
       setFormError('Event description is required.')
       return
@@ -121,6 +131,7 @@ export default function EventsPage() {
     }
 
     createMutation.mutate({
+      projectId: selectedProjectId,
       report_id: reportId ? reportId : null,
       event_type: eventType.trim(),
       description: description.trim(),

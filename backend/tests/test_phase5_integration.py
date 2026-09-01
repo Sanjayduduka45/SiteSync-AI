@@ -147,7 +147,7 @@ def test_full_successful_extraction_flow():
         assert extraction_data["status"] == "completed"
         assert extraction_data["confidence_score"] == 0.96
         assert extraction_data["field_input_id"] == inp.id
-        assert extraction_data["model_version"] == "gemini-1.5-flash:extraction_v1"
+        assert extraction_data["model_version"] == extraction_service.gemini_service.model_version_string
 
         activities = extraction_data["extracted_data"]["extracted_activities"]
         assert len(activities) == 2

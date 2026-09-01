@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 import jwt
+from jwt import PyJWKClient, PyJWKClientError
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -26,6 +27,20 @@ logger = logging.getLogger(__name__)
 # Security scheme: Bearer token
 security_bearer = HTTPBearer(auto_error=False)
 
+# Cached PyJWKClient instance
+_jwks_client: PyJWKClient | None = None
+
+
+def get_jwks_client() -> PyJWKClient | None:
+    """Retrieve or initialize cached PyJWKClient for Supabase JWKS verification."""
+    global _jwks_client
+    settings = get_settings()
+    if settings.supabase_url and _jwks_client is None:
+        base_url = settings.supabase_url.rstrip("/")
+        jwks_url = f"{base_url}/auth/v1/.well-known/jwks.json"
+        _jwks_client = PyJWKClient(jwks_url, cache_keys=True, max_cached_keys=16)
+    return _jwks_client
+
 
 def create_error_response(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     """Helper to generate standard error responses."""
@@ -40,8 +55,9 @@ def create_error_response(code: str, message: str, details: dict[str, Any] | Non
 
 def decode_supabase_jwt(token: str) -> dict[str, Any]:
     """
-    Decodes and validates a Supabase Auth JWT token.
-    Fails closed on any validation error.
+    Decodes and validates a Supabase Auth JWT token with mandatory cryptographic signature verification.
+    Supports asymmetric JWKS public keys (RS256/ES256) and symmetric secrets (HS256).
+    Fails closed on any validation or signature error. Never bypasses signature verification.
     """
     settings = get_settings()
 
@@ -52,50 +68,118 @@ def decode_supabase_jwt(token: str) -> dict[str, Any]:
         )
 
     try:
-        # If a JWT secret or service role key is configured, verify signature
-        secret = settings.supabase_jwt_secret or settings.supabase_service_role_key
-
-        if secret and not settings.is_development:
-            # Full signature verification
-            payload = jwt.decode(
-                token,
-                secret,
-                algorithms=["HS256", "RS256", "ES256"],
-                options={"verify_exp": True, "verify_aud": False},
+        header = jwt.get_unverified_header(token)
+        alg = header.get("alg")
+        if not alg:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=create_error_response("INVALID_TOKEN", "Token missing alg header claim"),
             )
-        else:
-            # In development/test mode without live secret, verify standard claims
-            # but allow decode with signature verification bypassed if secret is not set
-            if secret:
+
+        payload: dict[str, Any] | None = None
+
+        if alg in ["RS256", "ES256", "EdDSA"]:
+            # Asymmetric key verification via Supabase JWKS endpoint
+            jwks_client = get_jwks_client()
+            if not jwks_client:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=create_error_response("AUTH_FAILED", "JWKS client is not configured"),
+                )
+            try:
+                signing_key = jwks_client.get_signing_key_from_jwt(token)
                 payload = jwt.decode(
                     token,
-                    secret,
-                    algorithms=["HS256", "RS256", "ES256"],
+                    signing_key.key,
+                    algorithms=[alg],
                     options={"verify_exp": True, "verify_aud": False},
                 )
-            else:
-                payload = jwt.decode(
-                    token,
-                    options={"verify_signature": False, "verify_exp": True},
+            except PyJWKClientError as err:
+                logger.warning(f"JWKS key lookup failed: {err}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=create_error_response("INVALID_TOKEN", f"Invalid token signing key: {str(err)}"),
                 )
 
-        user_id = payload.get("sub")
-        email = payload.get("email")
+        elif alg == "HS256":
+            # Symmetric key verification using configured secret(s)
+            allowed_secrets: list[str] = []
+            if settings.supabase_jwt_secret:
+                allowed_secrets.append(settings.supabase_jwt_secret)
+            if settings.supabase_service_role_key:
+                allowed_secrets.append(settings.supabase_service_role_key)
+            if settings.is_development:
+                allowed_secrets.append("test-secret")
 
+            if not allowed_secrets:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=create_error_response("AUTH_FAILED", "No verification secret configured for HS256"),
+                )
+
+            last_sig_error: Exception | None = None
+            for secret in allowed_secrets:
+                try:
+                    payload = jwt.decode(
+                        token,
+                        secret,
+                        algorithms=["HS256"],
+                        options={"verify_exp": True, "verify_aud": False},
+                    )
+                    last_sig_error = None
+                    break
+                except jwt.InvalidSignatureError as err:
+                    last_sig_error = err
+                except jwt.ExpiredSignatureError:
+                    raise
+
+            if last_sig_error is not None:
+                raise last_sig_error
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=create_error_response("INVALID_TOKEN", f"Unsupported token signing algorithm: {alg}"),
+            )
+
+        if not payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=create_error_response("INVALID_TOKEN", "Unable to decode token payload"),
+            )
+
+        user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=create_error_response("INVALID_TOKEN", "Token missing subject claim"),
             )
 
+        # Mandatory issuer validation in production
+        if settings.supabase_url and not settings.is_development:
+            expected_iss = f"{settings.supabase_url.rstrip('/')}/auth/v1"
+            token_iss = payload.get("iss")
+            if not token_iss:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=create_error_response("INVALID_TOKEN", "Token missing issuer claim"),
+                )
+            if token_iss != expected_iss:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=create_error_response("INVALID_TOKEN", f"Invalid token issuer: {token_iss}"),
+                )
+
         return payload
 
+    except HTTPException:
+        raise
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=create_error_response("TOKEN_EXPIRED", "Authentication token has expired"),
         )
-    except jwt.InvalidTokenError as err:
+    except (jwt.InvalidTokenError, jwt.PyJWTError) as err:
         logger.warning(f"Invalid JWT token: {err}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -148,10 +232,11 @@ class MembershipRegistry:
     """
     In-memory / repository store for user <-> project memberships.
     Ensures strict server-side validation against unauthorized cross-project access (IDOR).
+    Supports explicit registration by user ID or user email.
     """
 
     def __init__(self) -> None:
-        # key: (user_id, project_id) -> (role, project_name, project_code)
+        # key: (user_id_or_email, project_id) -> (role, project_name, project_code)
         self._memberships: dict[tuple[str, str], tuple[ProjectRole, str, str]] = {}
         # key: project_id -> (name, code, description)
         self._projects: dict[str, dict[str, Any]] = {}
@@ -174,22 +259,27 @@ class MembershipRegistry:
 
         self._memberships[(user_id, project_id)] = (role, project_name, project_code)
 
-    def get_user_membership(self, user_id: str, project_id: str) -> ProjectMembershipSummary | None:
-        key = (user_id, project_id)
-        if key not in self._memberships:
-            return None
-        role, name, code = self._memberships[key]
-        return ProjectMembershipSummary(
-            project_id=project_id,
-            project_name=name,
-            project_code=code,
-            role=role,
-        )
+    def get_user_membership(self, user_id: str, project_id: str, email: str = "") -> ProjectMembershipSummary | None:
+        for ident in (user_id, email):
+            if not ident:
+                continue
+            key = (ident, project_id)
+            if key in self._memberships:
+                role, name, code = self._memberships[key]
+                return ProjectMembershipSummary(
+                    project_id=project_id,
+                    project_name=name,
+                    project_code=code,
+                    role=role,
+                )
+        return None
 
-    def list_user_memberships(self, user_id: str) -> list[ProjectMembershipSummary]:
+    def list_user_memberships(self, user_id: str, email: str = "") -> list[ProjectMembershipSummary]:
         results: list[ProjectMembershipSummary] = []
-        for (uid, pid), (role, name, code) in self._memberships.items():
-            if uid == user_id:
+        matched_project_ids: set[str] = set()
+        for (ident, pid), (role, name, code) in self._memberships.items():
+            if (ident == user_id or (email and ident == email)) and pid not in matched_project_ids:
+                matched_project_ids.add(pid)
                 results.append(
                     ProjectMembershipSummary(
                         project_id=pid,
@@ -198,12 +288,6 @@ class MembershipRegistry:
                         role=role,
                     )
                 )
-        # If user has no explicit memberships registered yet, auto-enroll in default demo project for dev
-        if not results and "proj-mtp-001" in self._projects:
-            self.add_membership(user_id, "proj-mtp-001", ProjectRole.PLANNER)
-            self.add_membership(user_id, "proj-demo-001", ProjectRole.SUPERVISOR)
-            return self.list_user_memberships(user_id)
-
         return results
 
     def get_project(self, project_id: str) -> dict[str, Any] | None:
@@ -237,6 +321,21 @@ membership_registry.seed_project(
     description="High Voltage Power Station Facility",
 )
 
+# Seed explicit memberships for development user (explicit, never automatic for arbitrary users)
+# Primary Supabase account: sanjaydudka70@gmail.com (ID: ae939aff-00f3-4492-a91f-d68963075e2f)
+for uid in ("sanjaydudka70@gmail.com", "sanjayduduka70@gmail.com", "ae939aff-00f3-4492-a91f-d68963075e2f"):
+    membership_registry.add_membership(
+        user_id=uid,
+        project_id="proj-mtp-001",
+        role=ProjectRole.PLANNER,
+    )
+    membership_registry.add_membership(
+        user_id=uid,
+        project_id="proj-demo-001",
+        role=ProjectRole.SUPERVISOR,
+    )
+
+
 
 def require_project_membership(
     project_id: str,
@@ -257,8 +356,8 @@ def require_project_membership(
                 detail=create_error_response("PROJECT_NOT_FOUND", f"Project '{project_id}' not found"),
             )
 
-        # Check membership
-        membership = membership_registry.get_user_membership(current_user.id, project_id)
+        # Check membership (by user ID or email)
+        membership = membership_registry.get_user_membership(current_user.id, project_id, current_user.email)
         if not membership:
             logger.warning(
                 f"Unauthorized cross-project access attempt by user {current_user.id} on project {project_id}"

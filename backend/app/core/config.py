@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # AI / Gemini Configuration (Phase 5+)
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.6-flash"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

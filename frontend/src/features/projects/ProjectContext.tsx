@@ -37,11 +37,12 @@ export function ProjectProvider({
 }: ProjectProviderProps) {
   const auth = useContext(AuthContext)
   const isAuthenticated = auth ? auth.isAuthenticated : true
+  const isAuthLoading = auth?.loading ?? false
 
   const { data, isLoading } = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () => apiGet<AuthMeBackendResponse>('/v1/auth/me'),
-    enabled: Boolean(isAuthenticated && !initialProjects),
+    enabled: Boolean(isAuthenticated && !isAuthLoading && !initialProjects),
     staleTime: 60_000,
   })
 
@@ -54,11 +55,20 @@ export function ProjectProvider({
   }))
 
   const [explicitSelectedProjectId, setExplicitSelectedProjectId] = useState<string | null>(() => {
-    if (initialSelectedProjectId) return initialSelectedProjectId
-    return typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
+    if (initialSelectedProjectId && initialSelectedProjectId !== 'null' && initialSelectedProjectId !== 'undefined') {
+      return initialSelectedProjectId
+    }
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      return stored && stored !== 'null' && stored !== 'undefined' ? stored : null
+    }
+    return null
   })
 
-  // Derive effective project ID without setState in effect
+  // Derive effective project ID:
+  // 1. If explicitSelectedProjectId is set AND is in loadedProjects, use it.
+  // 2. Otherwise, if loadedProjects has elements, default to loadedProjects[0].projectId.
+  // 3. Otherwise (zero memberships), effective project ID is strictly null.
   const activeProjectId = (() => {
     if (explicitSelectedProjectId && loadedProjects.some((p) => p.projectId === explicitSelectedProjectId)) {
       return explicitSelectedProjectId
@@ -67,9 +77,14 @@ export function ProjectProvider({
   })()
 
   const selectProject = (projectId: string) => {
-    setExplicitSelectedProjectId(projectId)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, projectId)
+    if (!projectId || projectId === 'null' || projectId === 'undefined') {
+      return
+    }
+    if (loadedProjects.some((p) => p.projectId === projectId)) {
+      setExplicitSelectedProjectId(projectId)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, projectId)
+      }
     }
   }
 

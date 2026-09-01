@@ -287,7 +287,7 @@ async def test_gemini_hallucinated_raw_input_id_is_overwritten():
 
     assert result.field_input_id == correct_input.id
     assert result.extracted_data["raw_input_id"] == correct_input.id
-    assert result.model_version == "gemini-1.5-flash:extraction_v1"
+    assert result.model_version == extraction_service.gemini_service.model_version_string
 
 
 # --- 4. Deterministic Normalization Tests ---
@@ -710,4 +710,86 @@ def test_extraction_service_has_no_phase6_dependencies():
         "critical_path",
         "risk_engine",
     ]:
-        assert f"import {forbidden}" not in module_code
+        assert forbidden not in module_code
+
+
+@pytest.mark.asyncio
+async def test_rerun_extraction_by_id_endpoint():
+    """
+    Validates that POST /api/v1/projects/{project_id}/extractions/{extraction_id}
+    successfully looks up the extraction record and triggers re-extraction on its field input.
+    """
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.services.input_service import input_service
+    from app.services.extraction_service import extraction_service
+    from app.core.auth import membership_registry
+    from app.schemas.auth import ProjectRole
+    from app.schemas.inputs import TextInputCreate
+    import jwt, time
+
+    client = TestClient(app)
+
+    project_id = "proj-mtp-001"
+    user_id = "sanjaydudka70@gmail.com"
+
+    membership_registry.seed_project(project_id=project_id, name="MTP", code="MTP-2026")
+    membership_registry.add_membership(user_id=user_id, project_id=project_id, role=ProjectRole.SUPERVISOR)
+
+    inp = input_service.create_text_input(
+        project_id=project_id,
+        data=TextInputCreate(raw_text="Poured 50 cubic meters foundation concrete."),
+        submitted_by_id=user_id,
+    )
+
+    mock_llm_json = {
+        "extracted_activities": [
+            {
+                "description": "Poured foundation concrete",
+                "progress_value": 50.0,
+                "progress_unit": "cubic meters",
+                "discipline": "civil",
+                "evidence_tokens": ["Poured 50 cubic meters"],
+            }
+        ],
+        "extraction_confidence": 0.95,
+    }
+
+    # Initial extraction via service
+    ext1 = await extraction_service.extract_and_persist(
+        project_id=project_id,
+        field_input_id=inp.id,
+        fake_response=mock_llm_json,
+    )
+    assert ext1.id is not None
+
+    token = jwt.encode({"sub": user_id, "email": user_id, "exp": int(time.time()) + 3600}, "test-secret", algorithm="HS256")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    from unittest.mock import patch, AsyncMock
+    from app.schemas.extractions import ExtractionResult
+
+    mock_res = ExtractionResult(
+        raw_input_id=inp.id,
+        extracted_activities=[
+            ExtractedActivity(
+                description="Poured foundation concrete",
+                progress_value=50.0,
+                progress_unit="cubic meters",
+                discipline="civil",
+                evidence_tokens=["Poured 50 cubic meters"],
+            )
+        ],
+        extraction_confidence=0.95,
+        model_version=extraction_service.gemini_service.model_version_string,
+    )
+
+    with patch.object(extraction_service.gemini_service, "extract_structured_data", new_callable=AsyncMock, return_value=mock_res):
+        resp = client.post(
+            f"/api/v1/projects/{project_id}/extractions/{ext1.id}",
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["field_input_id"] == inp.id
+        assert data["status"] == "completed"

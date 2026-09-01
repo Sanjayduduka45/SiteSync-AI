@@ -63,7 +63,9 @@ export default function FieldInputsPage() {
   )
 
   const deleteMutation = useMutation({
-    mutationFn: (inputId: string) => deleteFieldInput(selectedProjectId!, inputId),
+    // Pass projectId through mutation variables to avoid stale closure from hook creation.
+    mutationFn: ({ projectId, inputId }: { projectId: string; inputId: string }) =>
+      deleteFieldInput(projectId, inputId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['field-inputs', selectedProjectId] })
       queryClient.invalidateQueries({ queryKey: ['project-extractions', selectedProjectId] })
@@ -366,34 +368,42 @@ export default function FieldInputsPage() {
               </button>
             </div>
 
-            {/* Active Tab Form */}
-            {activeModalTab === 'text' && (
-              <TextInputForm
-                projectId={selectedProjectId!}
-                onSuccess={handleCreated}
-                onCancel={() => setIsSubmitModalOpen(false)}
-              />
-            )}
-            {activeModalTab === 'voice' && (
-              <VoiceRecorder
-                projectId={selectedProjectId!}
-                onSuccess={handleCreated}
-                onCancel={() => setIsSubmitModalOpen(false)}
-              />
-            )}
-            {activeModalTab === 'photo' && (
-              <PhotoUploadForm
-                projectId={selectedProjectId!}
-                onSuccess={handleCreated}
-                onCancel={() => setIsSubmitModalOpen(false)}
-              />
-            )}
-            {activeModalTab === 'document' && (
-              <DocumentUploadForm
-                projectId={selectedProjectId!}
-                onSuccess={handleCreated}
-                onCancel={() => setIsSubmitModalOpen(false)}
-              />
+            {/* Active Tab Form — guard: only render when a valid project is selected */}
+            {!selectedProjectId ? (
+              <div role="alert" className="p-4 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+                No project is selected. Please select an authorized project from the header before submitting.
+              </div>
+            ) : (
+              <>
+                {activeModalTab === 'text' && (
+                  <TextInputForm
+                    projectId={selectedProjectId}
+                    onSuccess={handleCreated}
+                    onCancel={() => setIsSubmitModalOpen(false)}
+                  />
+                )}
+                {activeModalTab === 'voice' && (
+                  <VoiceRecorder
+                    projectId={selectedProjectId}
+                    onSuccess={handleCreated}
+                    onCancel={() => setIsSubmitModalOpen(false)}
+                  />
+                )}
+                {activeModalTab === 'photo' && (
+                  <PhotoUploadForm
+                    projectId={selectedProjectId}
+                    onSuccess={handleCreated}
+                    onCancel={() => setIsSubmitModalOpen(false)}
+                  />
+                )}
+                {activeModalTab === 'document' && (
+                  <DocumentUploadForm
+                    projectId={selectedProjectId}
+                    onSuccess={handleCreated}
+                    onCancel={() => setIsSubmitModalOpen(false)}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -405,7 +415,7 @@ export default function FieldInputsPage() {
           input={selectedInput}
           currentRole={currentRole}
           onClose={() => setSelectedInput(null)}
-          onDelete={(inputId) => deleteMutation.mutate(inputId)}
+          onDelete={(inputId) => selectedProjectId && deleteMutation.mutate({ projectId: selectedProjectId, inputId })}
           isDeleting={deleteMutation.isPending}
         />
       )}

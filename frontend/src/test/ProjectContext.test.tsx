@@ -70,4 +70,33 @@ describe('ProjectProvider', () => {
     expect(screen.getByTestId('selected-name')).toHaveTextContent('Downtown Medical Center')
     expect(screen.getByTestId('selected-role')).toHaveTextContent('viewer')
   })
+
+  it('falls back to first authorized project when stored localStorage project ID is stale/invalid', () => {
+    localStorage.setItem('sitesync_selected_project_id', 'proj-unauthorized-999')
+    const client = new QueryClient()
+    render(
+      <QueryClientProvider client={client}>
+        <ProjectProvider initialProjects={mockProjects}>
+          <TestConsumer />
+        </ProjectProvider>
+      </QueryClientProvider>,
+    )
+
+    // Falls back to proj-mtp-001
+    expect(screen.getByTestId('selected-id')).toHaveTextContent('proj-mtp-001')
+  })
+
+  it('handles zero memberships cleanly with null selectedProjectId', () => {
+    const client = new QueryClient()
+    render(
+      <QueryClientProvider client={client}>
+        <ProjectProvider initialProjects={[]}>
+          <TestConsumer />
+        </ProjectProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByTestId('project-count')).toHaveTextContent('0')
+    expect(screen.getByTestId('selected-id')).toHaveTextContent('')
+  })
 })

@@ -48,12 +48,8 @@ def create_jwt(user_id: str, email: str = "test@example.com") -> str:
         "exp": now + 3600,
         "iat": now,
     }
-    import base64
-    import json
-
-    header_b64 = base64.urlsafe_b64encode(b'{"alg":"none","typ":"JWT"}').decode().rstrip("=")
-    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
-    return f"{header_b64}.{payload_b64}."
+    import jwt
+    return jwt.encode(payload, "test-secret", algorithm="HS256")
 
 
 @pytest.fixture(autouse=True)

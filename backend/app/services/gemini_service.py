@@ -63,7 +63,7 @@ class GeminiService:
     ) -> None:
         settings = get_settings()
         self._api_key = api_key if api_key is not None else settings.gemini_api_key
-        self.model = model or settings.gemini_model or "gemini-1.5-flash"
+        self.model = model or settings.gemini_model or "gemini-3.6-flash"
         self.temperature = temperature
         self.timeout = timeout
         self.max_retries = max_retries
@@ -152,10 +152,18 @@ class GeminiService:
         while True:
             attempt += 1
             try:
-                # Wrap in asyncio timeout to strictly enforce 15s barrier
                 coro = llm.ainvoke(messages)
                 response = await asyncio.wait_for(coro, timeout=self.timeout)
-                return str(response.content)
+                content = response.content
+                if isinstance(content, list):
+                    text_parts: list[str] = []
+                    for part in content:
+                        if isinstance(part, str):
+                            text_parts.append(part)
+                        elif isinstance(part, dict) and "text" in part:
+                            text_parts.append(str(part["text"]))
+                    return "".join(text_parts)
+                return str(content)
 
             except asyncio.TimeoutError as err:
                 logger.warning(f"Gemini request timed out after {self.timeout}s (attempt {attempt}/{self.max_retries + 1})")
